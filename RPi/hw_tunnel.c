@@ -50,6 +50,10 @@ tunnel_pair tun_pair;
 int tun_tap_iface_create(char *name, int type);
 int serial_port_create(char *name, int baud);
 void signal_handler(int signal);
+int cread(int fd, char *buf, int n);
+int cwrite(int fd, char *buf, int n);
+int read_n(int fd, char *buf, int n);
+int write_n(int fd, char *buf, int n);
 void *read_tuntap_write_serial(void *param);
 void *read_serial_write_tuntap(void *param);
 
@@ -116,6 +120,68 @@ void signal_handler(int signal)
     exit(1);
 }
 
+int cread(int fd, char *buf, int n)
+{
+    int nread;
+
+    if ( (nread = read(fd, buf, n)) < 0 )
+    {
+        perror("Reading data");
+        exit(1);
+    }
+    return nread;
+}
+
+int cwrite(int fd, char *buf, int n)
+{
+    int nwrite;
+
+    if ( (nwrite = write(fd, buf, n)) < 0 )
+    {
+        perror("Writing data");
+        exit(1);
+    }
+    return nwrite;
+}
+
+int read_n(int fd, char *buf, int n)
+{
+    int nread, left = n;
+
+    while(left > 0) 
+    {
+        if ( ( nread = read(fd, buf, left) )==0 )
+        {
+            return 0 ;      
+        }
+        else 
+        {
+            left -= nread;
+            buf += nread;
+        }      
+    }
+    return n;  
+}
+
+int write_n(int fd, char *buf, int n)
+{
+    int nwrite, left = n;
+
+    while(left > 0) 
+    {
+        if ( ( nwrite = write(fd, buf, left) )==0 )
+        {
+            return 0 ;      
+        }
+        else
+        {
+            left -= nwrite;
+            buf += nwrite;
+        }    
+    }
+    return n;  
+}
+
 void *read_tuntap_write_serial_thread(void *param)
 {
     tunnel_pair* pair = (tunnel_pair *)param;
@@ -130,8 +196,7 @@ void *read_tuntap_write_serial_thread(void *param)
         len = read(tuntapfd, buffer, sizeof(buffer));
         if (len > 0)
         {
-            // TBD: Use 'write' in a loop to guarantee that all bytes have been sent
-            write(serialfd, buffer, len);
+            write_n(serialfd, buffer, len);
         }
     }
 }
@@ -150,8 +215,7 @@ void *read_serial_write_tuntap_thread(void *param)
         len = read(serialfd, buffer, sizeof(buffer));
         if (len > 0)
         {
-            // TBD: Use 'write' in a loop to guarantee that all bytes have been sent
-            write(tuntapfd, buffer, len);
+            write_n(tuntapfd, buffer, len);
         }
     }
 }
@@ -203,19 +267,7 @@ int main(void)
     pthread_join( thread1, NULL );
     pthread_join( thread2, NULL );
 
-    /*
-    //int rx_bytes = 0;
-    //int tx_bytes = 0;
-
-    while(1)
-    {
-        len = read(tun_pair.tuntapfd, buffer, sizeof(buffer));
-        if (len > 0)
-        {
-            write(tun_pair.serialfd, buffer, len);
-        }
-    }
-    */
+    printf("\nThe end is near...");
 
     return 0;
 }
